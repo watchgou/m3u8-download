@@ -87,7 +87,7 @@ struct M3u8Command {
     l_dir: String,
 
     /// 文件名称
-    #[arg(short, long, default_value = "")]
+    #[arg(short, long, default_value = "index")]
     file_name: String,
 
     /// suffix 默认 后缀 .ts
