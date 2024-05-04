@@ -90,7 +90,7 @@ struct M3u8Command {
     #[arg(short, long, default_value = "index")]
     file_name: String,
 
-    /// suffix 默认 后缀 .ts
+    /// 后缀名
     #[arg(short, long, default_value = ".ts")]
     suffix: String,
 }
