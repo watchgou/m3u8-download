@@ -21,7 +21,7 @@ const METHOD: &str = "METHOD=";
 
 const URL: &str = "URI=";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Ext {
     version: Option<u32>,
     target_duration: Option<u32>,
