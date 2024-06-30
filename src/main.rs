@@ -21,6 +21,8 @@ const METHOD: &str = "METHOD=";
 
 const URL: &str = "URI=";
 
+const IV: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
 #[derive(Debug, Clone)]
 struct Ext {
     version: Option<u32>,
@@ -160,18 +162,25 @@ async fn analyze(
         }
 
         if line.starts_with(EXT_X_KEY) {
-            let value = line.split(EXT_X_KEY);
             let mut key_hash: HashMap<String, String> = HashMap::new();
-            value.last().unwrap().split(",").for_each(|key| {
-                if key.starts_with(METHOD) {
-                    let method = key.split(METHOD).last().unwrap().to_string();
-                    key_hash.insert(METHOD.to_string(), method);
-                }
-                if key.starts_with(URL) {
-                    let uri = key.split(URL).last().unwrap().to_string();
-                    key_hash.insert(URL.to_string(), uri.replace("\"", ""));
-                }
-            });
+            line.split(EXT_X_KEY)
+                .last()
+                .unwrap()
+                .split(",")
+                .for_each(|key| {
+                    if key.starts_with(METHOD) {
+                        key_hash.insert(
+                            METHOD.to_string(),
+                            key.split(METHOD).last().unwrap().to_string(),
+                        );
+                    }
+                    if key.starts_with(URL) {
+                        key_hash.insert(
+                            URL.to_string(),
+                            key.split(URL).last().unwrap().to_string().replace("\"", ""),
+                        );
+                    }
+                });
 
             ext.set_key(key_hash);
         }
@@ -191,9 +200,7 @@ async fn down_load(ext: &Ext, m3u8: &M3u8Command) -> Result<(), Box<dyn std::err
     if let Some(uri_list) = &ext.uri_list {
         if let Some(key_value) = &ext.key {
             let mut count: u32 = 1;
-            let method = key_value.get(METHOD).unwrap();
-            let key_url = key_value.get(URL).unwrap();
-            if method.is_empty() || key_url.is_empty() {
+            if key_value.get(METHOD).unwrap().is_empty() || key_value.get(URL).unwrap().is_empty() {
                 for uri in uri_list.iter() {
                     let mut buf = request_resource(&m3u8.domain_name, uri).await?;
                     let _ = write_file.write_all(&mut buf).unwrap();
@@ -201,13 +208,16 @@ async fn down_load(ext: &Ext, m3u8: &M3u8Command) -> Result<(), Box<dyn std::err
                     count += 1;
                 }
             } else {
-                let key_resp = reqwest::get(format!("{}{}", &m3u8.domain_name, key_url)).await?;
+                let key_resp = reqwest::get(format!(
+                    "{}{}",
+                    &m3u8.domain_name,
+                    key_value.get(URL).unwrap()
+                ))
+                .await?;
                 let key = key_resp.text().await?;
-
-                let iv: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                 for uri in uri_list.iter() {
                     let buf = request_resource(&m3u8.domain_name, uri).await?;
-                    let mut result = decrypt(key.as_bytes(), &iv, &buf).await?;
+                    let mut result = decrypt(key.as_bytes(), &IV, &buf).await?;
                     let _ = write_file.write_all(&mut result).unwrap();
                     println!("{}/{}", count, uri_list.len());
                     count += 1;
