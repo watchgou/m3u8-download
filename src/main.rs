@@ -100,11 +100,15 @@ struct M3u8Command {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let m3u8 = M3u8Command::parse();
+
     let mut ext = Ext::new();
-    let response = reqwest::get(&m3u8.m_url).await?;
-    let text = response.text().await?;
+
+    let text = reqwest::get(&m3u8.m_url).await?.text().await?;
+
     analyze(&mut ext, text, &m3u8.suffix).await?;
+
     down_load(&ext, &m3u8).await?;
+
     Ok(())
 }
 
@@ -157,23 +161,14 @@ async fn analyze(
 
         if line.starts_with(EXT_X_KEY) {
             let mut key_hash: HashMap<String, String> = HashMap::new();
+
             line.split(EXT_X_KEY)
                 .last()
                 .unwrap()
                 .split(",")
                 .for_each(|key| {
-                    if key.starts_with(METHOD) {
-                        key_hash.insert(
-                            METHOD.to_string(),
-                            key.split(METHOD).last().unwrap().to_string(),
-                        );
-                    }
-                    if key.starts_with(URL) {
-                        key_hash.insert(
-                            URL.to_string(),
-                            key.split(URL).last().unwrap().to_string().replace("\"", ""),
-                        );
-                    }
+                    set_hash(&key, METHOD, &mut key_hash);
+                    set_hash(&key, URL, &mut key_hash);
                 });
 
             ext.set_key(key_hash);
@@ -247,4 +242,16 @@ fn acquire_string(context: &str, keyword: &str) -> String {
     let data = context.split(keyword);
     let value = data.last().unwrap().to_string();
     value
+}
+
+fn set_hash(v1: &str, keyword: &str, key_hash: &mut HashMap<String, String>) {
+    if v1.starts_with(keyword) {
+        let result = v1
+            .split(keyword)
+            .last()
+            .unwrap()
+            .to_string()
+            .replace("\"", "");
+        key_hash.insert(v1.to_string(), result);
+    }
 }
