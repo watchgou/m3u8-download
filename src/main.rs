@@ -114,11 +114,10 @@ async fn decrypt(
     data: &[u8],
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut final_result = Vec::<u8>::new();
-    let mut read_buf = buffer::RefReadBuffer::new(data);
     let mut buffer = [0; 819200];
     let mut write_buf = buffer::RefWriteBuffer::new(&mut buffer);
     aes::cbc_decryptor(KeySize::KeySize128, key, &iv, blockmodes::PkcsPadding)
-        .decrypt(&mut read_buf, &mut write_buf, true)
+        .decrypt(&mut buffer::RefReadBuffer::new(data), &mut write_buf, true)
         .unwrap();
 
     final_result.extend(
@@ -128,7 +127,6 @@ async fn decrypt(
             .iter()
             .map(|&i| i),
     );
-    //println!("{:#?}", final_result);
     Ok(final_result)
 }
 
@@ -139,25 +137,21 @@ async fn analyze(
 ) -> Result<(), Box<dyn std::error::Error>> {
     m3u8_value.split("\n").for_each(|line| {
         if line.starts_with(EXT_X_VERSION) {
-            let value = line.split(EXT_X_VERSION);
-            let version = value.last().unwrap().to_string().parse::<u32>().unwrap();
+            let version = acquire_u32(&line, EXT_X_VERSION);
             ext.set_version(version);
         }
         if line.starts_with(EXT_X_TARGETDURATION) {
-            let value = line.split(EXT_X_TARGETDURATION);
-            let target_duration = value.last().unwrap().to_string().parse::<u32>().unwrap();
+            let target_duration = acquire_u32(&line, EXT_X_TARGETDURATION);
             ext.set_target_duration(target_duration);
         }
 
         if line.starts_with(EXT_X_PLAYLIST_TYPE) {
-            let value = line.split(EXT_X_PLAYLIST_TYPE);
-            let play_list_type = value.last().unwrap().to_string();
+            let play_list_type = acquire_string(&line, EXT_X_PLAYLIST_TYPE);
             ext.set_play_list_type(play_list_type);
         }
 
         if line.starts_with(EXT_X_MEDIA_SEQUENCE) {
-            let value = line.split(EXT_X_MEDIA_SEQUENCE);
-            let media_sequence = value.last().unwrap().to_string().parse::<u32>().unwrap();
+            let media_sequence = acquire_u32(&line, EXT_X_MEDIA_SEQUENCE);
             ext.set_media_sequence(media_sequence);
         }
 
@@ -241,4 +235,16 @@ async fn request_resource(
         .unwrap()
         .to_vec();
     Ok(value)
+}
+
+fn acquire_u32(context: &str, keyword: &str) -> u32 {
+    let data = context.split(keyword);
+    let value = data.last().unwrap().to_string().parse::<u32>().unwrap();
+    value
+}
+
+fn acquire_string(context: &str, keyword: &str) -> String {
+    let data = context.split(keyword);
+    let value = data.last().unwrap().to_string();
+    value
 }
