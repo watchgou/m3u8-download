@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs::File, io::Write};
 
-use clap::{command, Parser};
+use clap::Parser;
 use crypto::{
     aes::{self, KeySize},
     blockmodes::{self},
